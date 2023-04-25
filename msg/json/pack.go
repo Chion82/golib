@@ -18,8 +18,62 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"reflect"
 )
+
+func tryTypeUnpack(buffer []byte, msg Message) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%s", e)
+		}
+	}()
+	if unpackFunc := reflect.ValueOf(msg).MethodByName("Unpack"); unpackFunc.Kind() != reflect.Func {
+		return errors.New("unpack func not found")
+	} else {
+		params := []reflect.Value{
+			reflect.ValueOf(buffer),
+		}
+		rets := unpackFunc.Call(params)
+		if len(rets) != 1 {
+			return errors.New("wrong return from unpack func")
+		}
+		if rets[0].IsNil() {
+			return nil
+		}
+		if ret, ok := rets[0].Interface().(error); ok {
+			return ret
+		}
+	}
+	return errors.New("invalid pack func")
+}
+
+func tryTypePack(msg Message) (buffer []byte, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%s", e)
+		}
+	}()
+	if packFunc := reflect.ValueOf(msg).MethodByName("Pack"); packFunc.Kind() != reflect.Func {
+		return nil, errors.New("pack func not found")
+	} else {
+		params := []reflect.Value{}
+		rets := packFunc.Call(params)
+		if len(rets) != 2 {
+			return nil, errors.New("invalid return from pack func")
+		}
+		if buf, ok := rets[0].Interface().([]byte); ok {
+			if rets[1].IsNil() {
+				return buf, nil
+			}
+			if err, ok := rets[1].Interface().(error); ok {
+				return buf, err
+			}
+		}
+	}
+	return nil, errors.New("invalid pack func")
+}
 
 func (msgCtl *MsgCtl) unpack(typeByte byte, buffer []byte, msgIn Message) (msg Message, err error) {
 	if msgIn == nil {
@@ -34,8 +88,20 @@ func (msgCtl *MsgCtl) unpack(typeByte byte, buffer []byte, msgIn Message) (msg M
 		msg = msgIn
 	}
 
+	if tryError := tryTypeUnpack(buffer, msg); tryError == nil {
+		return
+	}
+
 	err = json.Unmarshal(buffer, &msg)
 	return
+}
+
+func (msgCtl *MsgCtl) pack(msg Message) ([]byte, error) {
+	if buf, tryError := tryTypePack(msg); tryError == nil {
+		return buf, nil
+	}
+
+	return json.Marshal(msg)
 }
 
 func (msgCtl *MsgCtl) UnPackInto(buffer []byte, msg Message) (err error) {
@@ -53,7 +119,7 @@ func (msgCtl *MsgCtl) Pack(msg Message) ([]byte, error) {
 		return nil, ErrMsgType
 	}
 
-	content, err := json.Marshal(msg)
+	content, err := msgCtl.pack(msg)
 	if err != nil {
 		return nil, err
 	}
