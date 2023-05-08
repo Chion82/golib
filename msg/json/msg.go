@@ -25,6 +25,11 @@ var (
 // Message wraps socket packages for communicating between frpc and frps.
 type Message interface{}
 
+type Packable interface {
+	Pack() ([]byte, error)
+	Unpack(buf []byte) error
+}
+
 type MsgCtl struct {
 	typeMap     map[byte]reflect.Type
 	typeByteMap map[reflect.Type]byte

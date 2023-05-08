@@ -29,24 +29,12 @@ func tryTypeUnpack(buffer []byte, msg Message) (err error) {
 			err = fmt.Errorf("%s", e)
 		}
 	}()
-	if unpackFunc := reflect.ValueOf(msg).MethodByName("Unpack"); unpackFunc.Kind() != reflect.Func {
-		return errors.New("unpack func not found")
+	if packable, ok := msg.(Packable); ok {
+		err = packable.Unpack(buffer)
 	} else {
-		params := []reflect.Value{
-			reflect.ValueOf(buffer),
-		}
-		rets := unpackFunc.Call(params)
-		if len(rets) != 1 {
-			return errors.New("wrong return from unpack func")
-		}
-		if rets[0].IsNil() {
-			return nil
-		}
-		if ret, ok := rets[0].Interface().(error); ok {
-			return ret
-		}
+		err = errors.New("unpack func not found")
 	}
-	return errors.New("invalid pack func")
+	return
 }
 
 func tryTypePack(msg Message) (buffer []byte, err error) {
@@ -55,24 +43,12 @@ func tryTypePack(msg Message) (buffer []byte, err error) {
 			err = fmt.Errorf("%s", e)
 		}
 	}()
-	if packFunc := reflect.ValueOf(msg).MethodByName("Pack"); packFunc.Kind() != reflect.Func {
-		return nil, errors.New("pack func not found")
+	if packable, ok := msg.(Packable); ok {
+		buffer, err = packable.Pack()
 	} else {
-		params := []reflect.Value{}
-		rets := packFunc.Call(params)
-		if len(rets) != 2 {
-			return nil, errors.New("invalid return from pack func")
-		}
-		if buf, ok := rets[0].Interface().([]byte); ok {
-			if rets[1].IsNil() {
-				return buf, nil
-			}
-			if err, ok := rets[1].Interface().(error); ok {
-				return buf, err
-			}
-		}
+		err = errors.New("pack func not found")
 	}
-	return nil, errors.New("invalid pack func")
+	return
 }
 
 func (msgCtl *MsgCtl) unpack(typeByte byte, buffer []byte, msgIn Message) (msg Message, err error) {
