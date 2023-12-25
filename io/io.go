@@ -64,8 +64,8 @@ func WithCompression(rwc io.ReadWriteCloser) io.ReadWriteCloser {
 }
 
 type ReadWriteCloser struct {
-	r       io.Reader
-	w       io.Writer
+	R       io.Reader
+	W       io.Writer
 	closeFn func() error
 
 	closed bool
@@ -75,19 +75,19 @@ type ReadWriteCloser struct {
 // closeFn will be called only once
 func WrapReadWriteCloser(r io.Reader, w io.Writer, closeFn func() error) io.ReadWriteCloser {
 	return &ReadWriteCloser{
-		r:       r,
-		w:       w,
+		R:       r,
+		W:       w,
 		closeFn: closeFn,
 		closed:  false,
 	}
 }
 
 func (rwc *ReadWriteCloser) Read(p []byte) (n int, err error) {
-	return rwc.r.Read(p)
+	return rwc.R.Read(p)
 }
 
 func (rwc *ReadWriteCloser) Write(p []byte) (n int, err error) {
-	return rwc.w.Write(p)
+	return rwc.W.Write(p)
 }
 
 func (rwc *ReadWriteCloser) Close() (errRet error) {
@@ -100,14 +100,14 @@ func (rwc *ReadWriteCloser) Close() (errRet error) {
 	rwc.mu.Unlock()
 
 	var err error
-	if rc, ok := rwc.r.(io.Closer); ok {
+	if rc, ok := rwc.R.(io.Closer); ok {
 		err = rc.Close()
 		if err != nil {
 			errRet = err
 		}
 	}
 
-	if wc, ok := rwc.w.(io.Closer); ok {
+	if wc, ok := rwc.W.(io.Closer); ok {
 		err = wc.Close()
 		if err != nil {
 			errRet = err
