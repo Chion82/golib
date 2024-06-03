@@ -119,6 +119,14 @@ func defaultDialOptions() dialOptions {
 	}
 }
 
+func WithDialer(netDialer *net.Dialer) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.dialer = func(ctx context.Context, addr string) (c net.Conn, err error) {
+			return dial(ctx, addr, netDialer, o)
+		}
+	})
+}
+
 func WithProxy(proxyType string, address string) DialOption {
 	return newFuncDialOption(func(do *dialOptions) {
 		if proxyType == "" && address == "" {

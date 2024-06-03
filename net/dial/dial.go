@@ -64,7 +64,7 @@ func DialContext(ctx context.Context, addr string, opts ...DialOption) (c net.Co
 	if op.dialer != nil {
 		c, err = op.dialer(ctx, dstAddr)
 	} else {
-		c, err = dial(ctx, dstAddr, op)
+		c, err = dial(ctx, dstAddr, nil, &op)
 	}
 	if err != nil {
 		return nil, err
@@ -88,12 +88,14 @@ func DialContext(ctx context.Context, addr string, opts ...DialOption) (c net.Co
 	return
 }
 
-func dial(ctx context.Context, addr string, op dialOptions) (c net.Conn, err error) {
+func dial(ctx context.Context, addr string, dialer *net.Dialer, op *dialOptions) (c net.Conn, err error) {
 	switch op.protocol {
 	case "tcp":
-		dialer := &net.Dialer{
-			Timeout:   op.timeout,
-			KeepAlive: op.keepAlive,
+		if dialer == nil {
+			dialer = &net.Dialer{
+				Timeout:   op.timeout,
+				KeepAlive: op.keepAlive,
+			}
 		}
 		if op.laddr != "" {
 			if tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:", op.laddr)); err == nil {
